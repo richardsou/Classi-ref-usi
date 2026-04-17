@@ -214,8 +214,16 @@ export default function App() {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      // Extra error context for unauthorized Vercel domains
+      if (error.code === 'auth/unauthorized-domain') {
+        alert("Atenção: O domínio atual (Vercel) não está autorizado para login. Vá no Firebase Console -> Authentication -> Settings -> Authorized domains e adicione a URL da sua aplicação.");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // Usuário apenas fechou o popup
+      } else {
+        alert("Ocorreu um erro no login com o Google: " + error.message);
+      }
     }
   };
 
@@ -282,7 +290,7 @@ export default function App() {
 
   if (loading) return <Loading appName={appSettings.appName} logoUrl={appSettings.logoUrl} logoHeight={appSettings.logoHeight} />;
 
-  if (!user || !userProfile) return <Login onLogin={handleLogin} appName={appSettings.appName} logoUrl={appSettings.logoUrl} logoHeight={appSettings.logoHeight} />;
+  if (!user || !userProfile) return <Login onGoogleLogin={handleLogin} appName={appSettings.appName} logoUrl={appSettings.logoUrl} logoHeight={appSettings.logoHeight} />;
 
   const isAdmin = userProfile?.role === 'admin' || user?.email === 'jamaicamo94@gmail.com';
   const permissions = isAdmin ? ADMIN_PERMISSIONS : (userProfile?.permissions || DEFAULT_PERMISSIONS);

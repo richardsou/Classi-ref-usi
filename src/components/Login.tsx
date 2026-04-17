@@ -4,13 +4,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, auth } from '../firebase';
 
 interface LoginProps {
-  onLogin: () => void;
+  onGoogleLogin: () => void;
   appName?: string;
   logoUrl?: string;
   logoHeight?: number;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLogin, appName = 'Classificação de Refugo', logoUrl, logoHeight = 64 }) => {
+export const Login: React.FC<LoginProps> = ({ onGoogleLogin, appName = 'Classificação de Refugo', logoUrl, logoHeight = 64 }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +30,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, appName = 'Classificaçã
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      onLogin();
+      // Auth state change will handle the login transition automatically
     } catch (err: any) {
       console.error('Auth error:', err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
@@ -168,7 +168,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, appName = 'Classificaçã
           </div>
 
           <button
-            onClick={onLogin}
+            onClick={onGoogleLogin}
             className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-3"
           >
             <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
