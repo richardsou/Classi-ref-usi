@@ -33,6 +33,7 @@ export const InsertManager: React.FC<InsertManagerProps> = ({
   
   // Form states
   const [isMovingStock, setIsMovingStock] = useState(false);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [stockMovement, setStockMovement] = useState({
     insertId: '',
     type: 'exit' as 'exit',
@@ -163,8 +164,8 @@ export const InsertManager: React.FC<InsertManagerProps> = ({
       setMessage({ type: 'error', text: 'Informe a matrícula do operador.' });
       return;
     }
-    if (finalOperatorId.length < 5) {
-      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 5 dígitos.' });
+    if (finalOperatorId.length < 3) {
+      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 3 dígitos.' });
       return;
     }
     if (quantity <= 0) {
@@ -447,15 +448,33 @@ export const InsertManager: React.FC<InsertManagerProps> = ({
 
         {activeView === 'withdraw' && (
           <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar modelo de inserto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-100 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all text-xs"
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar modelo de inserto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-gray-100 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all text-xs"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setStockMovement({
+                    insertId: '',
+                    type: 'exit',
+                    quantity: 1,
+                    line: '',
+                    operatorId: ''
+                  });
+                  setIsMovingStock(true);
+                }}
+                className="flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md shadow-blue-100 hover:bg-blue-700 transition-all text-xs whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Saída (Manual)
+              </button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -522,22 +541,40 @@ export const InsertManager: React.FC<InsertManagerProps> = ({
             >
               <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-xl font-bold text-gray-900">Retirar Inserto</h3>
-                <button onClick={() => setIsMovingStock(false)} className="p-2 hover:bg-gray-50 rounded-xl">
+                <button onClick={() => { setIsMovingStock(false); setModalSearchTerm(''); }} className="p-2 hover:bg-gray-50 rounded-xl">
                   <X className="w-6 h-6 text-gray-400" />
                 </button>
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-1">
                   <label className="text-sm font-bold text-gray-700">Inserto</label>
+                  {!stockMovement.insertId && (
+                    <input
+                      type="text"
+                      placeholder="Buscar modelo..."
+                      value={modalSearchTerm}
+                      onChange={(e) => setModalSearchTerm(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 mb-2 focus:ring-2 focus:ring-blue-500 outline-none text-xs"
+                    />
+                  )}
                   <select
                     value={stockMovement.insertId}
                     onChange={(e) => setStockMovement({ ...stockMovement, insertId: e.target.value })}
                     className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                   >
                     <option value="">Selecione um inserto...</option>
-                    {inserts.map(i => (
-                      <option key={i.id} value={i.id}>{i.code} - {i.description}</option>
-                    ))}
+                    {inserts
+                      .filter(i => 
+                        !modalSearchTerm || 
+                        i.code.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                        i.description.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                      )
+                      .map(i => {
+                        const totalStock = stocks.filter(s => s.insertId === i.id).reduce((acc, s) => acc + s.quantity, 0);
+                        return (
+                          <option key={i.id} value={i.id}>{i.code} - {i.description} (Em uso: {totalStock})</option>
+                        )
+                      })}
                   </select>
                 </div>
 
@@ -572,11 +609,16 @@ export const InsertManager: React.FC<InsertManagerProps> = ({
                     className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none font-medium"
                   >
                     <option value="">Selecione uma linha...</option>
-                    {productionLines.map(l => (
-                      <option key={l.id} value={l.name} className={cn("font-bold", LINE_COLORS.find(c => c.class === l.color)?.text)}>
-                        {l.name}
-                      </option>
-                    ))}
+                    {productionLines.map(l => {
+                      const lineStock = stockMovement.insertId 
+                        ? stocks.find(s => s.insertId === stockMovement.insertId && s.line === l.name)?.quantity || 0 
+                        : 0;
+                      return (
+                        <option key={l.id} value={l.name} className={cn("font-bold", LINE_COLORS.find(c => c.class === l.color)?.text)}>
+                          {l.name} {stockMovement.insertId ? `(Em uso: ${lineStock})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 

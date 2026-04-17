@@ -7,9 +7,11 @@ import { SUGGESTED_COLORS } from '../constants';
 
 interface DefectManagerProps {
   defectTypes: DefectTypeConfig[];
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export const DefectManager: React.FC<DefectManagerProps> = ({ defectTypes }) => {
+export const DefectManager: React.FC<DefectManagerProps> = ({ defectTypes, canEdit = true, canDelete = true }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -90,13 +92,15 @@ export const DefectManager: React.FC<DefectManagerProps> = ({ defectTypes }) => 
             <Settings className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-semibold text-gray-900">Gerenciar Defeitos</h2>
           </div>
-          <button
-            onClick={handleStartAdding}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm font-bold text-sm w-full sm:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Defeito
-          </button>
+          {canEdit && (
+            <button
+              onClick={handleStartAdding}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm font-bold text-sm w-full sm:w-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Defeito
+            </button>
+          )}
         </div>
 
         <div className="p-6">
@@ -196,18 +200,22 @@ export const DefectManager: React.FC<DefectManagerProps> = ({ defectTypes }) => 
                     />
                     <span className="flex-1 font-medium text-gray-700 truncate">{type.name}</span>
                     <div className="flex items-center gap-1 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setEditingId(type.id)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setTypeToDelete(type.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => setEditingId(type.id)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => setTypeToDelete(type.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { db, doc, getDoc, setDoc, serverTimestamp, handleFirestoreError, OperationType, collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, getDocs, where, auth, limit } from '../firebase';
@@ -52,6 +52,38 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<InsertTransaction | null>(null);
 
+  const ALL_PERMISSIONS_LIST = [
+    { id: 'dashboard', label: 'Dashboard Refugo' },
+    { id: 'inserts', label: 'Dashboard Inserto' },
+    { id: 'registration', label: 'Novo Registro' },
+    { id: 'warehouse', label: 'Almoxarifado' },
+    { id: 'history', label: 'Histórico (Refugo)' },
+    { id: 'reports', label: 'Relatórios (Refugo)' },
+    { id: 'categories', label: 'Categorias (Refugo)' },
+    { id: 'settings', label: 'Sistema' },
+    { id: 'manageUsers', label: 'Gestão Usuários' },
+    { id: 'manageOperators', label: 'Gestão Operadores' },
+    { id: 'editRecords', label: 'Editar Registros' },
+    { id: 'deleteRecords', label: 'Excluir Registros' },
+    { id: 'insertEntries', label: 'Entradas (Inserto)' },
+    { id: 'insertWithdraw', label: 'Saídas (Inserto)' },
+    { id: 'insertHistory', label: 'Histórico (Inserto)' },
+    { id: 'insertReports', label: 'Relatórios (Inserto)' },
+    { id: 'insertModels', label: 'Modelos (Inserto)' },
+    { id: 'insertLines', label: 'Linhas (Inserto)' },
+    { id: 'insertCorrection', label: 'Correção (Inserto)' },
+    { id: 'improvements', label: 'Módulo Melhorias' },
+    { id: 'toolManagement', label: 'Gestão Ferramentas' },
+    { id: 'generateAIAnalysis', label: 'Gerar Análise IA' },
+    { id: 'generateAIImprovement', label: 'Gerar Melhoria IA' },
+    { id: 'generateAIEmail', label: 'Gerar E-mail IA' },
+    { id: 'generateAIWhatsapp', label: 'Gerar WhatsApp IA' }
+  ];
+
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.email === 'jamaicamo94@gmail.com';
+  const canEdit = isAdmin || permissions.editRecords;
+  const canDelete = isAdmin || permissions.deleteRecords;
+
   // App Settings State
   const [settings, setSettings] = useState<AppSettings>({
     appName: 'Classificação de Refugo',
@@ -88,6 +120,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
   const [editingLine, setEditingLine] = useState<ProductionLine | null>(null);
 
   // Stock Entry State
+  const [entrySearchTerm, setEntrySearchTerm] = useState('');
   const [stockEntry, setStockEntry] = useState({
     insertId: '',
     quantity: 1,
@@ -176,8 +209,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
         newUserRole === 'viewer' ? VIEWER_PERMISSIONS :
         DEFAULT_PERMISSIONS;
 
-      if (newUserRegistrationId.trim().length < 5) {
-        setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 5 dígitos.' });
+      if (newUserRegistrationId.trim().length < 3) {
+        setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 3 dígitos.' });
         setIsSaving(false);
         return;
       }
@@ -193,7 +226,14 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
 
         try {
           // Use a secondary app instance to create the user without signing out the admin
-          const secondaryApp = initializeApp(firebaseConfig, 'secondary');
+          let secondaryApp;
+          const apps = getApps();
+          const existingApp = apps.find(app => app.name === 'secondary');
+          if (existingApp) {
+            secondaryApp = existingApp;
+          } else {
+            secondaryApp = initializeApp(firebaseConfig, 'secondary');
+          }
           const secondaryAuth = getAuth(secondaryApp);
           const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserEmail.trim(), newUserPassword.trim());
           userId = userCredential.user.uid;
@@ -270,8 +310,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
 
   const handleSaveEdit = async () => {
     if (!editingUser) return;
-    if (editingUser.registrationId && editingUser.registrationId.trim().length < 5) {
-      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 5 dígitos.' });
+    if (editingUser.registrationId && editingUser.registrationId.trim().length < 3) {
+      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 3 dígitos.' });
       return;
     }
     setIsSaving(true);
@@ -292,8 +332,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
   };
 
   const handleUpdateRegistrationId = async (userId: string, registrationId: string) => {
-    if (registrationId.trim().length < 5) {
-      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 5 dígitos.' });
+    if (registrationId.trim().length < 3) {
+      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 3 dígitos.' });
       return;
     }
     try {
@@ -524,8 +564,8 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
       return;
     }
 
-    if (operatorId.length < 5) {
-      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 5 dígitos.' });
+    if (operatorId.length < 3) {
+      setMessage({ type: 'error', text: 'A matrícula deve ter no mínimo 3 dígitos.' });
       return;
     }
 
@@ -851,15 +891,33 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                           <div className="space-y-4">
                             <div className="space-y-1.5">
                               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Modelo de Inserto</label>
+                              {!stockEntry.insertId && (
+                                <input
+                                  type="text"
+                                  placeholder="Buscar modelo..."
+                                  value={entrySearchTerm}
+                                  onChange={(e) => setEntrySearchTerm(e.target.value)}
+                                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 mb-2 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                              )}
                               <select
                                 value={stockEntry.insertId}
                                 onChange={(e) => setStockEntry({ ...stockEntry, insertId: e.target.value })}
                                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                               >
                                 <option value="">Selecione um modelo...</option>
-                                {inserts.map(i => (
-                                  <option key={i.id} value={i.id}>{i.code} - {i.description}</option>
-                                ))}
+                                {inserts
+                                  .filter(i => 
+                                    !entrySearchTerm || 
+                                    i.code.toLowerCase().includes(entrySearchTerm.toLowerCase()) || 
+                                    i.description.toLowerCase().includes(entrySearchTerm.toLowerCase())
+                                  )
+                                  .map(i => {
+                                    const totalStock = stocks.filter(s => s.insertId === i.id).reduce((acc, s) => acc + s.quantity, 0);
+                                    return (
+                                      <option key={i.id} value={i.id}>{i.code} - {i.description} (Em uso: {totalStock})</option>
+                                    )
+                                  })}
                               </select>
                             </div>
 
@@ -973,20 +1031,24 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                     <td className="px-4 py-3 text-gray-600">{t.operatorName}</td>
                                     <td className="px-4 py-3 text-right">
                                       <div className="flex items-center justify-end gap-1">
-                                        <button
-                                          onClick={() => setEditingTransaction(t)}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                          title="Editar"
-                                        >
-                                          <Edit2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => setTransactionToDelete(t)}
-                                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                          title="Excluir"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        {canEdit && (
+                                          <button
+                                            onClick={() => setEditingTransaction(t)}
+                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title="Editar"
+                                          >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                        {canDelete && (
+                                          <button
+                                            onClick={() => setTransactionToDelete(t)}
+                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Excluir"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>
@@ -1066,20 +1128,24 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-1">
-                                    <button
-                                      onClick={() => setEditingTransaction(t)}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                      title="Editar"
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => setTransactionToDelete(t)}
-                                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => setEditingTransaction(t)}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Editar"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        onClick={() => setTransactionToDelete(t)}
+                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Excluir"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -1211,13 +1277,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                             className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                           />
                         </div>
-                        <button
-                          onClick={() => setIsAddingInsert(true)}
-                          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-100"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Novo Modelo
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => setIsAddingInsert(true)}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-100"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Novo Modelo
+                          </button>
+                        )}
                       </div>
 
                       <AnimatePresence>
@@ -1254,6 +1322,16 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                   type="number"
                                   value={newInsert.minStock}
                                   onChange={(e) => setNewInsert({ ...newInsert, minStock: Number(e.target.value) })}
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Preço (R$)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={newInsert.price || ''}
+                                  onChange={(e) => setNewInsert({ ...newInsert, price: Number(e.target.value) })}
                                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                               </div>
@@ -1316,7 +1394,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                     <input type="number" value={editingInsert.minStock} onChange={(e) => setEditingInsert({ ...editingInsert, minStock: Number(e.target.value) })} className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm" />
                                   </div>
                                   <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Imagem do Inserto</label>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Preço (R$)</label>
+                                    <input type="number" step="0.01" value={editingInsert.price || ''} onChange={(e) => setEditingInsert({ ...editingInsert, price: Number(e.target.value) })} className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm" />
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-gray-400 uppercase">Imagem do Inserto</label>
                                     <div className="flex items-center gap-2">
                                       {editingInsert.imageUrl && (
                                         <div className="w-8 h-8 rounded-md overflow-hidden border border-gray-200 flex-shrink-0">
@@ -1331,7 +1414,6 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                       />
                                     </div>
                                   </div>
-                                </div>
                                 <div className="flex gap-2 pt-2">
                                   <button onClick={handleUpdateInsert} className="flex-1 bg-blue-600 text-white font-bold py-2 rounded-xl text-xs">Salvar Alterações</button>
                                   <button onClick={() => setEditingInsert(null)} className="px-3 py-2 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs">Cancelar</button>
@@ -1365,8 +1447,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <button onClick={() => setEditingInsert(insert)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
-                                  <button onClick={() => setInsertToDelete(insert)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                  {canEdit && (
+                                    <button onClick={() => setEditingInsert(insert)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
+                                  )}
+                                  {canDelete && (
+                                    <button onClick={() => setInsertToDelete(insert)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -1380,13 +1466,15 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <h3 className="font-bold text-gray-900">Linhas de Produção</h3>
-                        <button
-                          onClick={() => setIsAddingLine(true)}
-                          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-100"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Nova Linha
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => setIsAddingLine(true)}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-bold text-sm shadow-lg shadow-blue-100"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Nova Linha
+                          </button>
+                        )}
                       </div>
 
                       <AnimatePresence>
@@ -1467,8 +1555,12 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                       <span className="text-sm font-bold text-gray-900 truncate">{line.name}</span>
                                     </div>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                      <button onClick={() => setEditingLine(line)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-3.5 h-3.5" /></button>
-                                      <button onClick={() => setLineToDelete(line)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                                      {canEdit && (
+                                        <button onClick={() => setEditingLine(line)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 className="w-3.5 h-3.5" /></button>
+                                      )}
+                                      {canDelete && (
+                                        <button onClick={() => setLineToDelete(line)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1528,7 +1620,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                       records={scrapRecords} 
                       onDelete={async (id) => setScrapToDelete(id)}
                       onEdit={() => {}} // In manager panel, we might just allow delete or view
-                      permissions={ADMIN_PERMISSIONS}
+                      permissions={{...permissions, deleteRecords: canDelete, editRecords: canEdit} as UserPermissions}
                     />
                   )}
                   {scrapSubTab === 'reports' && (
@@ -1538,7 +1630,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                   )}
                   {scrapSubTab === 'categories' && (
                     <div className="p-6">
-                      <DefectManager defectTypes={defectTypes} />
+                      <DefectManager defectTypes={defectTypes} canEdit={canEdit} canDelete={canDelete} />
                     </div>
                   )}
                 </div>
@@ -1708,26 +1800,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                                       </div>
                                       
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                          {[
-                                            { id: 'dashboard', label: 'Dashboard Refugo' },
-                                            { id: 'inserts', label: 'Dashboard Inserto' },
-                                            { id: 'registration', label: 'Novo Registro' },
-                                            { id: 'warehouse', label: 'Almoxarifado' },
-                                            { id: 'history', label: 'Histórico (Refugo)' },
-                                            { id: 'reports', label: 'Relatórios (Refugo)' },
-                                            { id: 'categories', label: 'Categorias (Refugo)' },
-                                            { id: 'settings', label: 'Sistema' },
-                                            { id: 'manageUsers', label: 'Gestão Usuários' },
-                                            { id: 'editRecords', label: 'Editar Registros' },
-                                            { id: 'deleteRecords', label: 'Excluir Registros' },
-                                            { id: 'insertEntries', label: 'Entradas (Inserto)' },
-                                            { id: 'insertWithdraw', label: 'Retiradas (Inserto)' },
-                                            { id: 'insertHistory', label: 'Histórico (Inserto)' },
-                                            { id: 'insertReports', label: 'Relatórios (Inserto)' },
-                                            { id: 'insertModels', label: 'Modelos (Inserto)' },
-                                            { id: 'insertLines', label: 'Linhas (Inserto)' },
-                                            { id: 'insertCorrection', label: 'Correção (Inserto)' }
-                                          ].map((perm) => (
+                                          {ALL_PERMISSIONS_LIST.map((perm) => (
                                             <button 
                                               key={perm.id} 
                                               onClick={() => handleTogglePermission(user.id, perm.id as keyof UserPermissions)} 
@@ -1988,32 +2061,7 @@ export const ManagerPanel: React.FC<ManagerPanelProps> = ({
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Permissões Detalhadas</label>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-2xl border border-gray-100">
-                    {[
-                      { id: 'dashboard', label: 'Dashboard Refugo' },
-                      { id: 'inserts', label: 'Dashboard Inserto' },
-                      { id: 'registration', label: 'Novo Registro' },
-                      { id: 'warehouse', label: 'Almoxarifado' },
-                      { id: 'history', label: 'Histórico (Refugo)' },
-                      { id: 'reports', label: 'Relatórios (Refugo)' },
-                      { id: 'categories', label: 'Categorias (Refugo)' },
-                      { id: 'settings', label: 'Sistema' },
-                      { id: 'manageUsers', label: 'Gestão Usuários' },
-                      { id: 'editRecords', label: 'Editar Registros' },
-                      { id: 'deleteRecords', label: 'Excluir Registros' },
-                      { id: 'manageOperators', label: 'Gestão Operadores' },
-                      { id: 'insertEntries', label: 'Entrada Inserto' },
-                      { id: 'insertWithdraw', label: 'Saída Inserto' },
-                      { id: 'insertHistory', label: 'Histórico Inserto' },
-                      { id: 'insertReports', label: 'Relatórios Inserto' },
-                      { id: 'insertModels', label: 'Modelos Inserto' },
-                      { id: 'insertLines', label: 'Linhas Inserto' },
-                      { id: 'insertCorrection', label: 'Correção Inserto' },
-                      { id: 'improvements', label: 'Módulo Melhorias' },
-                      { id: 'toolManagement', label: 'Gestão de Ferramentas' },
-                      { id: 'generateAIImprovement', label: 'Gerar Melhoria IA' },
-                      { id: 'generateAIEmail', label: 'Gerar E-mail IA' },
-                      { id: 'generateAIWhatsapp', label: 'Gerar WhatsApp IA' }
-                    ].map((perm) => (
+                    {ALL_PERMISSIONS_LIST.map((perm) => (
                       <button
                         key={perm.id}
                         onClick={() => {

@@ -21,6 +21,9 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
   const [activeTab, setActiveTab] = useState<'inventory' | 'transactions' | 'dashboard'>('inventory');
   const [searchTerm, setSearchTerm] = useState('');
   
+  const canEdit = isAdmin || permissions?.editRecords;
+  const canDelete = isAdmin || permissions?.deleteRecords;
+
   // Modals
   const [showAddTool, setShowAddTool] = useState(false);
   const [showTransaction, setShowTransaction] = useState(false);
@@ -36,6 +39,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
   const [newToolName, setNewToolName] = useState('');
   const [newToolMachine, setNewToolMachine] = useState<MachineType>('Torno');
   const [newToolStock, setNewToolStock] = useState(0);
+  const [newToolMinStock, setNewToolMinStock] = useState(0);
+  const [newToolPrice, setNewToolPrice] = useState<number | ''>('');
   const [newToolImage, setNewToolImage] = useState<string>('');
 
   // Transaction Form
@@ -128,6 +133,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
     setNewToolName('');
     setNewToolMachine('Torno');
     setNewToolStock(0);
+    setNewToolMinStock(0);
+    setNewToolPrice('');
     setNewToolImage('');
   };
 
@@ -140,6 +147,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
         code: newToolCode,
         name: newToolName,
         machineType: newToolMachine,
+        minStock: newToolMinStock,
+        price: newToolPrice === '' ? 0 : Number(newToolPrice),
         imageUrl: newToolImage
       };
 
@@ -180,6 +189,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
     setNewToolName(tool.name);
     setNewToolMachine(tool.machineType);
     setNewToolStock(tool.stock);
+    setNewToolMinStock(tool.minStock || 0);
+    setNewToolPrice(tool.price || '');
     setNewToolImage(tool.imageUrl || '');
     setShowAddTool(true);
   };
@@ -442,13 +453,15 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
             </div>
-            <button
-              onClick={() => { resetToolForm(); setShowAddTool(true); }}
-              className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
-            >
-              <Plus className="w-5 h-5" />
-              Nova Ferramenta
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => { resetToolForm(); setShowAddTool(true); }}
+                className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
+              >
+                <Plus className="w-5 h-5" />
+                Nova Ferramenta
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -465,15 +478,28 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                       </span>
                       <h3 className="font-bold text-gray-900 text-lg leading-tight">{tool.name}</h3>
                       <p className="text-sm text-gray-500">Cód: {tool.code}</p>
+                      {tool.price && <p className="text-xs text-green-600 font-bold mt-1">R$ {tool.price.toFixed(2).replace('.', ',')}</p>}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <button onClick={() => openEditTool(tool)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDeleteTool(tool.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-col gap-1 items-end">
+                    {tool.stock <= (tool.minStock || 0) && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-lg mb-2">
+                        <AlertCircle className="w-3 h-3" />
+                        Estoque Baixo
+                      </span>
+                    )}
+                    <div className="flex gap-1">
+                      {canEdit && (
+                        <button onClick={() => openEditTool(tool)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleDeleteTool(tool.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -491,7 +517,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                 <div className="mt-auto grid grid-cols-3 gap-2">
                   <button
                     onClick={() => openTransactionModal(tool, 'Entrada')}
-                    className="flex flex-col items-center justify-center p-2 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors"
+                    disabled={!canEdit}
+                    className="flex flex-col items-center justify-center p-2 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Entrada de Estoque"
                   >
                     <ArrowDown className="w-4 h-4 mb-1" />
@@ -499,8 +526,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                   </button>
                   <button
                     onClick={() => openTransactionModal(tool, 'Saída')}
-                    disabled={tool.stock <= 0}
-                    className="flex flex-col items-center justify-center p-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50"
+                    disabled={tool.stock <= 0 || !canEdit}
+                    className="flex flex-col items-center justify-center p-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Enviar para Linha"
                   >
                     <ArrowUp className="w-4 h-4 mb-1" />
@@ -508,8 +535,8 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                   </button>
                   <button
                     onClick={() => openTransactionModal(tool, 'Retorno')}
-                    disabled={tool.inUse <= 0}
-                    className="flex flex-col items-center justify-center p-2 bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 transition-colors disabled:opacity-50"
+                    disabled={tool.inUse <= 0 || !canEdit}
+                    className="flex flex-col items-center justify-center p-2 bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Retornar da Linha"
                   >
                     <RotateCcw className="w-4 h-4 mb-1" />
@@ -568,12 +595,16 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                     <td className="p-4 text-sm text-gray-600">{t.createdBy.name}</td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditTransaction(t)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setTransactionToDelete(t)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => openEditTransaction(t)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setTransactionToDelete(t)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -592,7 +623,7 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
       )}
 
       {activeTab === 'dashboard' && (
-        <ToolDashboard tools={tools} transactions={transactions} lines={lines} />
+        <ToolDashboard tools={tools} transactions={transactions} lines={lines} isAdmin={isAdmin} />
       )}
 
       {/* Add/Edit Tool Modal */}
@@ -633,20 +664,32 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome/Descrição</label>
                 <input type="text" required value={newToolName} onChange={e => setNewToolName(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Máquina</label>
-                <select value={newToolMachine} onChange={e => setNewToolMachine(e.target.value as MachineType)} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="Torno">Torno</option>
-                  <option value="Centro de Usinagem">Centro de Usinagem</option>
-                  <option value="Furação">Furação</option>
-                </select>
-              </div>
-              {!editingToolId && (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Inicial</label>
-                  <input type="number" min="0" required value={newToolStock} onChange={e => setNewToolStock(Number(e.target.value))} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Máquina</label>
+                  <select value={newToolMachine} onChange={e => setNewToolMachine(e.target.value as MachineType)} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Torno">Torno</option>
+                    <option value="Centro de Usinagem">Centro de Usinagem</option>
+                    <option value="Furação">Furação</option>
+                  </select>
                 </div>
-              )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Preço Unitário (R$)</label>
+                  <input type="number" min="0" step="0.01" value={newToolPrice} onChange={e => setNewToolPrice(e.target.value ? Number(e.target.value) : '')} placeholder="0.00" className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {!editingToolId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Inicial</label>
+                    <input type="number" min="0" required value={newToolStock} onChange={e => setNewToolStock(Number(e.target.value))} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Mínimo</label>
+                  <input type="number" min="0" required value={newToolMinStock} onChange={e => setNewToolMinStock(Number(e.target.value))} className="w-full p-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
                 <button type="button" onClick={() => setShowAddTool(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium">Cancelar</button>
                 <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -700,7 +743,14 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                     <label className="block text-sm font-medium text-gray-700 mb-1">Linha de Destino</label>
                     <select required value={transLine} onChange={e => setTransLine(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl">
                       <option value="">Selecione a linha...</option>
-                      {lines.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                      {lines.map(l => {
+                        const lineStock = selectedTool ? transactions.filter(t => t.toolId === selectedTool.id && t.line === l.name).reduce((acc, t) => t.type === 'Saída' ? acc + t.quantity : (t.type === 'Retorno' ? acc - t.quantity : acc), 0) : 0;
+                        return (
+                          <option key={l.id} value={l.name}>
+                            {l.name} {lineStock > 0 ? `(Em uso: ${lineStock})` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </>
@@ -721,7 +771,14 @@ export const ToolManager: React.FC<ToolManagerProps> = ({ currentUser, permissio
                     <label className="block text-sm font-medium text-gray-700 mb-1">Linha de Origem (Opcional)</label>
                     <select value={transLine} onChange={e => setTransLine(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl">
                       <option value="">Selecione a linha...</option>
-                      {lines.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                      {lines.map(l => {
+                        const lineStock = selectedTool ? transactions.filter(t => t.toolId === selectedTool.id && t.line === l.name).reduce((acc, t) => t.type === 'Saída' ? acc + t.quantity : (t.type === 'Retorno' ? acc - t.quantity : acc), 0) : 0;
+                        return (
+                          <option key={l.id} value={l.name}>
+                            {l.name} {lineStock > 0 ? `(Em uso: ${lineStock})` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </>

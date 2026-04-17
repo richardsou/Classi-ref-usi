@@ -16,18 +16,19 @@ import {
   Rectangle
 } from 'recharts';
 import { Tool, ToolTransaction, ProductionLine } from '../types';
-import { LayoutDashboard, TrendingUp, Trash2, Box, Activity } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Trash2, Box, Activity, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ToolDashboardProps {
   tools: Tool[];
   transactions: ToolTransaction[];
   lines: ProductionLine[];
+  isAdmin?: boolean;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
-export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transactions, lines }) => {
+export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transactions, lines, isAdmin = false }) => {
   const [selectedFactory, setSelectedFactory] = useState<string>('Todas');
   const [selectedLine, setSelectedLine] = useState<string>('Todas');
 
@@ -221,7 +222,25 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
       .filter(t => t.type === 'Retorno' && t.reason !== 'Retorno Almoxarifado')
       .reduce((acc, t) => acc + t.quantity, 0);
     
-    return { totalInUse, totalStock, totalDiscards };
+    const assetValueStock = tools.reduce((acc, t) => acc + (t.stock * (t.price || 0)), 0);
+    const assetValueInUse = tools.reduce((acc, t) => acc + (t.inUse * (t.price || 0)), 0);
+    
+    let totalDiscardCost = 0;
+    const discardDataCosts = new Map<string, number>();
+
+    transactions.forEach(t => {
+      if (t.type === 'Retorno' && t.reason !== 'Retorno Almoxarifado') {
+        const tool = tools.find(tl => tl.id === t.toolId);
+        const cost = t.quantity * (tool?.price || 0);
+        totalDiscardCost += cost;
+        discardDataCosts.set(t.reason, (discardDataCosts.get(t.reason) || 0) + cost);
+      }
+    });
+
+    const discardCostsArray = Array.from(discardDataCosts.entries())
+      .map(([name, value]) => ({ name, value }));
+
+    return { totalInUse, totalStock, totalDiscards, assetValueStock, assetValueInUse, totalDiscardCost, discardCostsArray };
   }, [tools, transactions]);
 
   if (sankeyData.nodes.length === 0 || sankeyData.links.length === 0) {
@@ -237,21 +256,24 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 border-b border-gray-50 pb-4 mb-4">
             <div className="p-3 bg-blue-50 rounded-xl">
               <Box className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Total em Uso</p>
+              <p className="text-sm font-medium text-gray-500">Ferramentas em Uso</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalInUse}</p>
             </div>
           </div>
+          {isAdmin && (
+            <p className="text-xs text-gray-500 font-medium">Patrimônio: <span className="text-green-600 font-bold">R$ {stats.assetValueInUse.toFixed(2).replace('.', ',')}</span></p>
+          )}
         </motion.div>
 
         <motion.div 
@@ -260,15 +282,18 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
           transition={{ delay: 0.1 }}
           className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 border-b border-gray-50 pb-4 mb-4">
             <div className="p-3 bg-green-50 rounded-xl">
               <TrendingUp className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Total em Estoque</p>
+              <p className="text-sm font-medium text-gray-500">Em Estoque</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalStock}</p>
             </div>
           </div>
+          {isAdmin && (
+            <p className="text-xs text-gray-500 font-medium">Patrimônio: <span className="text-green-600 font-bold">R$ {stats.assetValueStock.toFixed(2).replace('.', ',')}</span></p>
+          )}
         </motion.div>
 
         <motion.div 
@@ -277,7 +302,7 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
           transition={{ delay: 0.2 }}
           className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 border-b border-gray-50 pb-4 mb-4">
             <div className="p-3 bg-red-50 rounded-xl">
               <Trash2 className="w-6 h-6 text-red-600" />
             </div>
@@ -286,10 +311,58 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
               <p className="text-2xl font-bold text-gray-900">{stats.totalDiscards}</p>
             </div>
           </div>
+          {isAdmin && (
+            <p className="text-xs text-gray-500 font-medium">Perda Estimada: <span className="text-red-600 font-bold">R$ {stats.totalDiscardCost.toFixed(2).replace('.', ',')}</span></p>
+          )}
         </motion.div>
+
+        {isAdmin && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center bg-gradient-to-br from-gray-900 to-gray-800"
+          >
+            <p className="text-sm font-medium text-gray-400 mb-1">Patrimônio Total Ativo</p>
+            <p className="text-3xl font-black text-white">R$ {(stats.assetValueStock + stats.assetValueInUse).toFixed(2).replace('.', ',')}</p>
+            <div className="w-full bg-gray-700 h-1.5 rounded-full mt-4 overflow-hidden flex">
+              {stats.assetValueStock + stats.assetValueInUse > 0 && (
+                <>
+                  <div title="Estoque" className="bg-green-500 h-full" style={{ width: `${(stats.assetValueStock / (stats.assetValueStock + stats.assetValueInUse)) * 100}%` }}></div>
+                  <div title="Em Uso" className="bg-blue-500 h-full" style={{ width: `${(stats.assetValueInUse / (stats.assetValueStock + stats.assetValueInUse)) * 100}%` }}></div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Low Stock Alerts */}
+      {tools.filter(t => t.stock <= (t.minStock || 0)).length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-red-50 p-4 rounded-xl border border-red-100 mb-6 flex flex-col sm:flex-row gap-4"
+        >
+          <div className="flex-shrink-0">
+            <div className="w-10 h-10 bg-red-100 flex items-center justify-center rounded-full text-red-600">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+          </div>
+          <div>
+            <h4 className="text-red-800 font-bold mb-1">Atenção: Ferramentas com Estoque Baixo</h4>
+            <div className="flex flex-wrap gap-2">
+              {tools.filter(t => t.stock <= (t.minStock || 0)).map(t => (
+                <span key={t.id} className="bg-white border border-red-200 text-red-700 text-xs px-2 py-1 rounded-md font-medium">
+                  {t.name} (Atual: {t.stock} / Mín: {t.minStock})
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {/* Sankey Chart: Tools to Lines */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -412,7 +485,7 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
         >
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
             <Trash2 className="w-5 h-5 text-red-600" />
-            Motivos de Descarte
+            Quantidade de Descartes
           </h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -435,6 +508,40 @@ export const ToolDashboard: React.FC<ToolDashboardProps> = ({ tools, transaction
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Bar Chart: Financial Impact */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2"
+        >
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-red-600" />
+            Impacto Financeiro de Quebras/Descartes
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.discardCostsArray} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
+                <YAxis 
+                  tickFormatter={(value) => `R$ ${value}`}
+                  tick={{ fontSize: 12 }} axisLine={false} tickLine={false} 
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Custo']}
+                  cursor={{ fill: '#f9fafb' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                   {stats.discardCostsArray.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </motion.div>

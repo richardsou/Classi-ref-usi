@@ -188,6 +188,7 @@ export interface Insert {
   description: string;
   manufacturer?: string;
   minStock: number;
+  price?: number;
   imageUrl?: string;
 }
 
@@ -279,6 +280,8 @@ export interface Tool {
   name: string;
   machineType: MachineType;
   stock: number;
+  minStock?: number;
+  price?: number;
   inUse: number;
   imageUrl?: string;
 }

@@ -359,6 +359,7 @@ export default function App() {
             stocks={stocks}
             transactions={transactions}
             productionLines={productionLines}
+            isAdmin={isAdmin}
           />
         )}
         {activeTab === 'improvements' && permissions.improvements && (

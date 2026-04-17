@@ -21,6 +21,7 @@ interface InsertDashboardProps {
   stocks: InsertStock[];
   transactions: InsertTransaction[];
   productionLines: ProductionLine[];
+  isAdmin?: boolean;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -51,7 +52,7 @@ interface LineConsumption {
 
 type DateFilterOption = 'hoje' | 'ontem' | '3dias' | '7dias' | '15dias' | 'mes' | 'personalizado';
 
-export const InsertDashboard: React.FC<InsertDashboardProps> = ({ inserts, stocks, transactions, productionLines }) => {
+export const InsertDashboard: React.FC<InsertDashboardProps> = ({ inserts, stocks, transactions, productionLines, isAdmin = false }) => {
   const [dateFilter, setDateFilter] = useState<DateFilterOption>('mes');
   const [shiftFilter, setShiftFilter] = useState<Shift | 'todos'>('todos');
   const [customRange, setCustomRange] = useState({
@@ -146,7 +147,17 @@ export const InsertDashboard: React.FC<InsertDashboardProps> = ({ inserts, stock
     const periodEntries = filteredTransactions.filter(t => t.type === 'entry').reduce((acc, t) => acc + t.quantity, 0);
     const periodExits = filteredTransactions.filter(t => t.type === 'exit').reduce((acc, t) => acc + t.quantity, 0);
 
-    return { totalItems, lowStockCount, periodEntries, periodExits };
+    const assetValue = validStocks.reduce((acc, s) => {
+      const insert = inserts.find(i => i.id === s.insertId);
+      return acc + (Number(s.quantity) || 0) * (insert?.price || 0);
+    }, 0);
+
+    const lossValue = filteredTransactions.filter(t => t.type === 'exit').reduce((acc, t) => {
+      const insert = inserts.find(i => i.id === t.insertId);
+      return acc + t.quantity * (insert?.price || 0);
+    }, 0);
+
+    return { totalItems, lowStockCount, periodEntries, periodExits, assetValue, lossValue };
   }, [inserts, stocks, filteredTransactions]);
 
   // 2. Consumption Distribution by Line (Filtered by period)
@@ -412,7 +423,14 @@ export const InsertDashboard: React.FC<InsertDashboardProps> = ({ inserts, stock
           </div>
           <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Peças em Estoque</p>
           <div className="flex items-end justify-between">
-            <p className="text-3xl font-black text-gray-900 tracking-tight">{stockSummary.totalItems}</p>
+            <div>
+              <p className="text-3xl font-black text-gray-900 tracking-tight">{stockSummary.totalItems}</p>
+              {isAdmin && (
+                <p className="text-xs font-bold text-emerald-600 mt-1">
+                  Patrimônio: R$ {stockSummary.assetValue.toFixed(2).replace('.', ',')}
+                </p>
+              )}
+            </div>
             <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
           </div>
         </div>
@@ -475,7 +493,14 @@ export const InsertDashboard: React.FC<InsertDashboardProps> = ({ inserts, stock
           </div>
           <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-1">Saídas no Período</p>
           <div className="flex items-end justify-between">
-            <p className="text-3xl font-black text-amber-600 tracking-tight">-{stockSummary.periodExits}</p>
+            <div>
+              <p className="text-3xl font-black text-amber-600 tracking-tight">-{stockSummary.periodExits}</p>
+              {isAdmin && (
+                <p className="text-xs font-bold text-red-600 mt-1">
+                  Perdas Estimadas: R$ {stockSummary.lossValue.toFixed(2).replace('.', ',')}
+                </p>
+              )}
+            </div>
             <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-amber-500 transition-colors" />
           </div>
         </div>
