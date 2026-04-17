@@ -1,0 +1,273 @@
+{
+  "entities": {
+    "ScrapRecord": {
+      "title": "ScrapRecord",
+      "description": "A record of a scrap part in the foundry.",
+      "type": "object",
+      "properties": {
+        "partName": { "type": "string", "description": "Name of the part." },
+        "defectType": { "type": "string", "description": "Type of defect." },
+        "shift": { "type": "string", "description": "Production shift." },
+        "quantity": { "type": "integer", "description": "Number of pieces." },
+        "weight": { "type": "number", "description": "Total weight in kg." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Time of record." },
+        "operatorName": { "type": "string", "description": "Name of the operator." },
+        "userId": { "type": "string", "description": "UID of the user." },
+        "userEmail": { "type": "string", "format": "email", "description": "Email of the user." },
+        "notes": { "type": "string", "description": "Additional notes." }
+      },
+      "required": ["partName", "defectType", "shift", "quantity", "userId"]
+    },
+    "DefectTypeConfig": {
+      "title": "DefectTypeConfig",
+      "description": "Configuration for a defect type.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the defect." },
+        "color": { "type": "string", "description": "Color associated with the defect." },
+        "order": { "type": "integer", "description": "Display order." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation time." }
+      },
+      "required": ["name", "color", "order"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application settings.",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string", "description": "Display name of the application." },
+        "logoUrl": { "type": "string", "description": "URL of the application logo." },
+        "logoHeight": { "type": "integer", "description": "Height of the logo in pixels." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update time." }
+      },
+      "required": ["appName", "logoUrl"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "operator", "viewer", "custom"] },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "dashboard": { "type": "boolean" },
+            "registration": { "type": "boolean" },
+            "history": { "type": "boolean" },
+            "reports": { "type": "boolean" },
+            "inserts": { "type": "boolean" },
+            "editRecords": { "type": "boolean" },
+            "deleteRecords": { "type": "boolean" },
+            "categories": { "type": "boolean" },
+            "settings": { "type": "boolean" },
+            "manageUsers": { "type": "boolean" },
+            "manageOperators": { "type": "boolean" },
+            "insertEntries": { "type": "boolean" },
+            "insertWithdraw": { "type": "boolean" },
+            "insertHistory": { "type": "boolean" },
+            "insertReports": { "type": "boolean" },
+            "insertModels": { "type": "boolean" },
+            "insertLines": { "type": "boolean" },
+            "insertCorrection": { "type": "boolean" },
+            "improvements": { "type": "boolean" },
+            "toolManagement": { "type": "boolean" },
+            "generateAIImprovement": { "type": "boolean" },
+            "generateAIEmail": { "type": "boolean" },
+            "generateAIWhatsapp": { "type": "boolean" }
+          }
+        },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "isPending": { "type": "boolean" }
+      },
+      "required": ["email", "role", "permissions"]
+    },
+    "Insert": {
+      "title": "Insert",
+      "description": "An insert type (pastilha).",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Internal code of the insert." },
+        "description": { "type": "string", "description": "Description of the insert." },
+        "manufacturer": { "type": "string", "description": "Manufacturer name." },
+        "minStock": { "type": "integer", "description": "Minimum stock level for alerts." },
+        "imageUrl": { "type": "string", "description": "URL of the insert image." }
+      },
+      "required": ["code", "description", "minStock"]
+    },
+    "InsertTransaction": {
+      "title": "InsertTransaction",
+      "description": "A stock movement of an insert.",
+      "type": "object",
+      "properties": {
+        "insertId": { "type": "string", "description": "ID of the insert." },
+        "insertCode": { "type": "string", "description": "Code of the insert." },
+        "type": { "type": "string", "enum": ["entry", "exit"], "description": "Type of movement." },
+        "quantity": { "type": "integer", "description": "Quantity moved." },
+        "line": { "type": "string", "description": "Production line name." },
+        "operatorName": { "type": "string", "description": "Name of the operator." },
+        "operatorId": { "type": "string", "description": "Registration ID of the operator." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Time of transaction." }
+      },
+      "required": ["insertId", "insertCode", "type", "quantity", "line", "operatorName", "operatorId"]
+    },
+    "InsertStock": {
+      "title": "InsertStock",
+      "description": "Current stock level of an insert in a specific location.",
+      "type": "object",
+      "properties": {
+        "insertId": { "type": "string", "description": "ID of the insert." },
+        "line": { "type": "string", "description": "Production line name." },
+        "quantity": { "type": "integer", "description": "Current quantity." }
+      },
+      "required": ["insertId", "line", "quantity"]
+    },
+    "ProductionLine": {
+      "title": "ProductionLine",
+      "description": "A production line.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the line." }
+      },
+      "required": ["name"]
+    },
+    "Operator": {
+      "title": "Operator",
+      "description": "An operator in the factory.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Registration ID (Matrícula)." },
+        "name": { "type": "string", "description": "Full name of the operator." },
+        "function": { "type": "string", "description": "Job function." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update time." }
+      },
+      "required": ["id", "name", "function"]
+    },
+    "ImprovementRecord": {
+      "title": "ImprovementRecord",
+      "description": "A record of an improvement suggestion.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the improvement." },
+        "category": { "type": "string", "enum": ["Fábrica", "Máquina", "Operação", "Instrução de Trabalho"], "description": "Category of the improvement." },
+        "description": { "type": "string", "description": "Description of the problem and suggestion." },
+        "status": { "type": "string", "enum": ["Pendente", "Em Andamento", "Concluído"], "description": "Status of the improvement." },
+        "priority": { "type": "string", "enum": ["Baixa", "Média", "Alta"] },
+        "deadline": { "type": "string" },
+        "responsible": { "type": "string" },
+        "beforeImage": { "type": "string", "description": "Base64 encoded image of the before state." },
+        "afterImage": { "type": "string", "description": "Base64 encoded image of the after state." },
+        "archived": { "type": "boolean", "description": "Whether the record is archived." },
+        "aiContent": {
+          "type": "object",
+          "properties": {
+            "analysis": { "type": "string" },
+            "improvement": { "type": "string" },
+            "email": { "type": "string" },
+            "whatsapp": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Time of record." },
+        "createdBy": {
+          "type": "object",
+          "properties": {
+            "uid": { "type": "string" },
+            "name": { "type": "string" },
+            "email": { "type": "string" }
+          },
+          "required": ["uid", "name", "email"]
+        }
+      },
+      "required": ["title", "category", "description", "status", "createdBy"]
+    },
+    "Tool": {
+      "title": "Tool",
+      "description": "A machining tool.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "machineType": { "type": "string", "enum": ["Torno", "Centro de Usinagem", "Furação"] },
+        "stock": { "type": "integer" },
+        "inUse": { "type": "integer" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["code", "name", "machineType", "stock", "inUse"]
+    },
+    "ToolTransaction": {
+      "title": "ToolTransaction",
+      "description": "A transaction for a machining tool.",
+      "type": "object",
+      "properties": {
+        "toolId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Entrada", "Saída", "Retorno"] },
+        "reason": { "type": "string", "enum": ["Nova Entrada", "Em uso", "Colisão", "Desgaste", "Quebra", "Retorno Almoxarifado"] },
+        "line": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": {
+          "type": "object",
+          "properties": {
+            "uid": { "type": "string" },
+            "name": { "type": "string" },
+            "email": { "type": "string" }
+          }
+        }
+      },
+      "required": ["toolId", "toolName", "type", "reason", "quantity", "createdAt", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/scrap_records/{recordId}": {
+      "schema": "ScrapRecord",
+      "description": "Collection of scrap records."
+    },
+    "/defect_types/{typeId}": {
+      "schema": "DefectTypeConfig",
+      "description": "Collection of defect type configurations."
+    },
+    "/app_settings/{settingId}": {
+      "schema": "AppSettings",
+      "description": "Global application settings."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    },
+    "/inserts/{insertId}": {
+      "schema": "Insert",
+      "description": "Collection of insert types."
+    },
+    "/insert_transactions/{transactionId}": {
+      "schema": "InsertTransaction",
+      "description": "Collection of insert stock transactions."
+    },
+    "/insert_stocks/{stockId}": {
+      "schema": "InsertStock",
+      "description": "Collection of current insert stock levels."
+    },
+    "/production_lines/{lineId}": {
+      "schema": "ProductionLine",
+      "description": "Collection of production lines."
+    },
+    "/operators/{operatorId}": {
+      "schema": "Operator",
+      "description": "Collection of factory operators."
+    },
+    "/improvements/{improvementId}": {
+      "schema": "ImprovementRecord",
+      "description": "Collection of improvement suggestions."
+    },
+    "/tools/{toolId}": {
+      "schema": "Tool",
+      "description": "Collection of machining tools."
+    },
+    "/tool_transactions/{transactionId}": {
+      "schema": "ToolTransaction",
+      "description": "Collection of tool transactions."
+    }
+  }
+}

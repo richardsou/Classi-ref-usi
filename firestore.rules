@@ -1,0 +1,260 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.email == "jamaicamo94@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    function isOperator() {
+      return isAuthenticated() && 
+        (
+          request.auth.token.email == "jamaicamo94@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))
+        );
+    }
+
+    function isViewer() {
+      return isAuthenticated() && 
+        (
+          request.auth.token.email == "jamaicamo94@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'viewer' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))
+        );
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidScrapRecord(data) {
+      return (request.method == 'update' || data.keys().hasAll(['partName', 'defectType', 'shift', 'quantity', 'userId', 'timestamp'])) &&
+             (!('partName' in data) || (data.partName is string && data.partName.size() > 0 && data.partName.size() < 100)) &&
+             (!('defectType' in data) || data.defectType is string) &&
+             (!('shift' in data) || data.shift is string) &&
+             (!('quantity' in data) || (data.quantity is number && data.quantity > 0)) &&
+             (!('userId' in data) || data.userId == request.auth.uid);
+    }
+
+    function isValidDefectType(data) {
+      return (request.method == 'update' || data.keys().hasAll(['name', 'color', 'order'])) &&
+             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 50)) &&
+             (!('color' in data) || (data.color is string && data.color.matches("^#[0-9a-fA-F]{6}$"))) &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidUser(data) {
+      let requiredFields = ['email', 'role', 'displayName', 'photoURL'];
+      let allowedFields = ['email', 'role', 'permissions', 'displayName', 'photoURL', 'updatedAt', 'isPending', 'registrationId'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             data.email is string &&
+             data.role in ['admin', 'operator', 'viewer', 'custom'] &&
+             (!('permissions' in data) || data.permissions is map) &&
+             // Permission fields (made optional for legacy support)
+             (!('permissions' in data) || (
+               (!('dashboard' in data.permissions) || data.permissions.dashboard is bool) &&
+               (!('registration' in data.permissions) || data.permissions.registration is bool) &&
+               (!('history' in data.permissions) || data.permissions.history is bool) &&
+               (!('reports' in data.permissions) || data.permissions.reports is bool) &&
+               (!('inserts' in data.permissions) || data.permissions.inserts is bool) &&
+               (!('editRecords' in data.permissions) || data.permissions.editRecords is bool) &&
+               (!('deleteRecords' in data.permissions) || data.permissions.deleteRecords is bool) &&
+               (!('categories' in data.permissions) || data.permissions.categories is bool) &&
+               (!('warehouse' in data.permissions) || data.permissions.warehouse is bool) &&
+               (!('settings' in data.permissions) || data.permissions.settings is bool) &&
+               (!('manageUsers' in data.permissions) || data.permissions.manageUsers is bool) &&
+               (!('manageOperators' in data.permissions) || data.permissions.manageOperators is bool) &&
+               (!('insertEntries' in data.permissions) || data.permissions.insertEntries is bool) &&
+               (!('insertWithdraw' in data.permissions) || data.permissions.insertWithdraw is bool) &&
+               (!('insertHistory' in data.permissions) || data.permissions.insertHistory is bool) &&
+               (!('insertReports' in data.permissions) || data.permissions.insertReports is bool) &&
+               (!('insertModels' in data.permissions) || data.permissions.insertModels is bool) &&
+               (!('insertLines' in data.permissions) || data.permissions.insertLines is bool) &&
+               (!('insertCorrection' in data.permissions) || data.permissions.insertCorrection is bool) &&
+               (!('improvements' in data.permissions) || data.permissions.improvements is bool) &&
+               (!('toolManagement' in data.permissions) || data.permissions.toolManagement is bool) &&
+               (!('generateAIImprovement' in data.permissions) || data.permissions.generateAIImprovement is bool) &&
+               (!('generateAIEmail' in data.permissions) || data.permissions.generateAIEmail is bool) &&
+               (!('generateAIWhatsapp' in data.permissions) || data.permissions.generateAIWhatsapp is bool)
+             )) &&
+             data.displayName is string &&
+             data.photoURL is string &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
+             (!('isPending' in data) || data.isPending is bool) &&
+             (!('registrationId' in data) || data.registrationId is string);
+    }
+
+    function isValidInsert(data) {
+      return (request.method == 'update' || data.keys().hasAll(['code', 'description', 'minStock'])) &&
+             (!('code' in data) || (data.code is string && data.code.size() > 0)) &&
+             (!('description' in data) || (data.description is string && data.description.size() > 0)) &&
+             (!('minStock' in data) || (data.minStock is number && data.minStock >= 0)) &&
+             (!('imageUrl' in data) || data.imageUrl is string);
+    }
+
+    function isValidInsertTransaction(data) {
+      return (request.method == 'update' || data.keys().hasAll(['insertId', 'insertCode', 'type', 'quantity', 'line', 'operatorName', 'operatorId', 'timestamp'])) &&
+             (!('insertId' in data) || data.insertId is string) &&
+             (!('insertCode' in data) || data.insertCode is string) &&
+             (!('type' in data) || data.type in ['entry', 'exit']) &&
+             (!('quantity' in data) || (data.quantity is number && data.quantity > 0)) &&
+             (!('line' in data) || data.line is string) &&
+             (!('operatorName' in data) || data.operatorName is string) &&
+             (!('operatorId' in data) || data.operatorId is string);
+    }
+
+    function isValidInsertStock(data) {
+      return (request.method == 'update' || data.keys().hasAll(['insertId', 'line', 'quantity'])) &&
+             (!('insertId' in data) || data.insertId is string) &&
+             (!('line' in data) || data.line is string) &&
+             (!('quantity' in data) || (data.quantity is number && (request.method == 'update' || data.quantity >= 0)));
+    }
+
+    function isValidProductionLine(data) {
+      return (request.method == 'update' || data.keys().hasAll(['name'])) &&
+             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 100));
+    }
+
+    function isValidOperator(data) {
+      return (request.method == 'update' || data.keys().hasAll(['id', 'name', 'function'])) &&
+             (!('id' in data) || (data.id is string && data.id.size() > 0 && data.id.size() < 50)) &&
+             (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 100)) &&
+             (!('function' in data) || (data.function is string && data.function.size() > 0 && data.function.size() < 100));
+    }
+
+    function isValidImprovementRecord(data) {
+      return (request.method == 'update' || data.keys().hasAll(['title', 'category', 'description', 'status', 'createdAt', 'createdBy'])) &&
+             (!('title' in data) || (data.title is string && data.title.size() > 0 && data.title.size() < 200)) &&
+             (!('category' in data) || data.category in ['Fábrica', 'Máquina', 'Operação', 'Instrução de Trabalho', 'Peça']) &&
+             (!('description' in data) || (data.description is string && data.description.size() > 0 && data.description.size() < 5000)) &&
+             (!('status' in data) || data.status in ['Pendente', 'Em Andamento', 'Concluído']) &&
+             (!('priority' in data) || data.priority in ['Baixa', 'Média', 'Alta']) &&
+             (!('deadline' in data) || (data.deadline is string && data.deadline.size() <= 20)) &&
+             (!('responsible' in data) || (data.responsible is string && data.responsible.size() <= 100)) &&
+             (!('beforeImage' in data) || (data.beforeImage is string && data.beforeImage.size() <= 800000)) &&
+             (!('afterImage' in data) || (data.afterImage is string && data.afterImage.size() <= 800000)) &&
+             (!('archived' in data) || data.archived is bool) &&
+             (!('aiContent' in data) || data.aiContent is map) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('createdBy' in data) || (data.createdBy is map && data.createdBy.keys().hasAll(['uid', 'name', 'email'])));
+    }
+
+    match /scrap_records/{recordId} {
+      // Viewers can read, Operators can create/update, Admins can delete
+      allow read: if isViewer();
+      allow create, update: if isOperator() && isValidScrapRecord(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /defect_types/{typeId} {
+      // Only the admin can manage defect types
+      allow read: if isViewer();
+      allow create, update: if isAdmin() && isValidDefectType(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /app_settings/{settingId} {
+      // App settings are readable by anyone authenticated, but only editable by admin
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      // Allow users to read their own profile, admins to read all, 
+      // and allow searching for pre-authorization by email
+      allow read: if isAuthenticated() && (
+        isOwner(userId) || 
+        isAdmin() || 
+        (request.query.limit == 1 && request.query.filters.email == request.auth.token.email)
+      );
+      
+      // Allow creation if:
+      // 1. User is creating their own profile (and role is restricted unless they are the master admin)
+      // 2. An existing admin is pre-authorizing a new user
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && (
+          (request.auth.token.email == "jamaicamo94@gmail.com" && request.resource.data.role == 'admin') ||
+          (request.auth.token.email != "jamaicamo94@gmail.com" && request.resource.data.role == 'viewer')
+        )) ||
+        isAdmin()
+      );
+
+      // Only admin can update roles, or user updating their own non-role data
+      allow update: if (isAdmin() && isValidUser(request.resource.data)) || (
+        isOwner(userId) && 
+        isValidUser(request.resource.data) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.permissions == resource.data.permissions &&
+        (!('isPending' in request.resource.data) || request.resource.data.isPending == false)
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    match /inserts/{insertId} {
+      allow read: if isViewer();
+      allow create, update: if isOperator() && isValidInsert(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /insert_transactions/{transactionId} {
+      allow read: if isViewer();
+      allow create: if isOperator() && isValidInsertTransaction(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /insert_stocks/{stockId} {
+      allow read: if isViewer();
+      allow create, update: if isOperator() && isValidInsertStock(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /production_lines/{lineId} {
+      allow read: if isViewer();
+      allow create, update: if isOperator() && isValidProductionLine(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /operators/{operatorId} {
+      allow read: if isViewer();
+      allow create, update, delete: if isAdmin() && (request.method == 'delete' || isValidOperator(request.resource.data));
+    }
+
+    match /improvements/{improvementId} {
+      allow read: if isViewer();
+      allow create, update: if isOperator() && isValidImprovementRecord(request.resource.data);
+      allow delete: if isOperator() && (isAdmin() || resource.data.createdBy.uid == request.auth.uid);
+    }
+
+    match /tools/{toolId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.toolManagement == true);
+    }
+
+    match /tool_transactions/{transactionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.toolManagement == true);
+      allow update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
